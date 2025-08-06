@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スコアボード</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .btn {
+            @apply inline-block px-6 py-3 text-base font-semibold leading-normal text-center text-white align-middle transition-all duration-150 ease-in-out bg-blue-500 border-0 rounded-lg shadow-md cursor-pointer tracking-wide hover:shadow-lg hover:bg-blue-600 active:bg-blue-700 disabled:opacity-50;
+        }
+        /* テーブル行のスタイル */
+        .table-auto tbody tr:nth-child(even) {
+            @apply bg-white;
+        }
+        .table-auto tbody tr:nth-child(odd) {
+            @apply bg-gray-50;
+        }
+        .table-auto tbody tr:hover {
+            @apply bg-blue-50;
+        }
+        /* ハイライト用のスタイル */
+        tr.highlight {
+            background-color: #fef08a !important; /* Tailwind's yellow-200 */
+        }
+        tr.highlight:hover {
+            background-color: #fde047 !important; /* Tailwind's yellow-300 */
+        }
+        /* スクリーンセーバーのアニメーション */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 1.5s ease-in-out;
+        }
+        @keyframes scrollUp {
+            0% { transform: translateY(100%); opacity: 0; }
+            10% { transform: translateY(0); opacity: 1; }
+            90% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-100%); opacity: 0; }
+        }
+        .scroll-up-animation {
+            animation: scrollUp 12s linear forwards;
+        }
+        .arcade-font {
+            font-family: 'Press Start 2P', cursive;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div id="app-container">
+        <div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-6xl">
+            
+            <header class="mb-8 text-center relative">
+                <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-4">スコアボード</h1>
+                <button id="toggle-view-btn" class="btn">スコア登録</button>
+                <!-- スクリーンセーバー切り替えボタン -->
+                <div class="absolute top-0 right-0">
+                    <button id="screensaver-toggle-btn" class="p-3 rounded-full bg-gray-700 text-white hover:bg-gray-900 transition-colors" title="スクリーンセーバーモード">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <main>
+                <!-- スコア登録ビュー -->
+                <div id="register-view" class="hidden">
+                    <div class="bg-white p-6 sm:p-8 rounded-xl shadow-lg max-w-lg mx-auto">
+                        <h2 class="text-2xl font-bold mb-6 text-center">スコアを登録</h2>
+                        <form id="score-form" class="space-y-6">
+                            <div>
+                                <label for="nickname" class="block text-sm font-medium text-gray-700 mb-1">ニックネーム</label>
+                                <input type="text" id="nickname" name="nickname" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" value="名無し">
+                            </div>
+                            <div>
+                                <label for="gates" class="block text-sm font-medium text-gray-700 mb-1">ゲート通過数</label>
+                                <input type="number" id="gates" name="gates" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="例: 10">
+                            </div>
+                            <div>
+                                <label for="clear-time" class="block text-sm font-medium text-gray-700 mb-1">クリアタイム (任意)</label>
+                                <input type="text" id="clear-time" name="clear-time" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="例: 1:23.45">
+                            </div>
+                            <div class="text-center pt-4">
+                                <button type="submit" class="btn w-full sm:w-auto">登録する</button>
+                            </div>
+                        </form>
+                        <div id="form-error-message" class="hidden mt-4 p-3 bg-red-100 text-red-700 rounded-lg text-center"></div>
+                    </div>
+                </div>
+
+                <!-- スコアボードビュー -->
+                <div id="scoreboard-view">
+                     <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full table-auto">
+                                <thead>
+                                    <tr>
+                                        <th class="text-left p-6 border-b border-gray-200 bg-gray-50 text-sm font-semibold text-gray-500 uppercase tracking-wider">順位</th>
+                                        <th class="text-left p-6 border-b border-gray-200 bg-gray-50 text-sm font-semibold text-gray-500 uppercase tracking-wider">記録日時</th>
+                                        <th class="text-left p-6 border-b border-gray-200 bg-gray-50 text-sm font-semibold text-gray-500 uppercase tracking-wider">ニックネーム</th>
+                                        <th class="text-left p-6 border-b border-gray-200 bg-gray-50 text-sm font-semibold text-gray-500 uppercase tracking-wider">ゲート通過数</th>
+                                        <th class="text-left p-6 border-b border-gray-200 bg-gray-50 text-sm font-semibold text-gray-500 uppercase tracking-wider">クリアタイム</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scoreboard-body">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                     <!-- Save & Load Section -->
+                    <div id="save-load-section" class="mt-6 p-4 bg-gray-50 rounded-lg flex items-center justify-center space-x-2 text-sm">
+                        <label for="csv-input" class="sr-only">CSV Data</label>
+                        <input type="text" id="csv-input" class="flex-grow px-3 py-2 border border-gray-300 rounded-md" placeholder="ここにCSVデータをペーストして読み込み...">
+                        <button id="load-csv-btn" class="btn px-4 py-2 text-sm">読み込み</button>
+                        <button id="copy-csv-btn" class="btn px-4 py-2 text-sm bg-green-600 hover:bg-green-700">コピー</button>
+                        <span id="csv-message" class="ml-3 text-blue-700 font-medium"></span>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- スクリーンセーバービュー -->
+    <div id="screensaver-view" class="hidden fixed inset-0 bg-black bg-opacity-95 flex items-center justify-center z-50 p-8 overflow-hidden">
+        <div id="slide-content" class="text-white text-center w-full h-full flex items-center justify-center">
+            <!-- スライド内容はJSでここに挿入されます -->
+        </div>
+    </div>
+
+
+    <script>
+        // --- DOM要素の取得 ---
+        const appContainer = document.getElementById('app-container');
+        const registerView = document.getElementById('register-view');
+        const scoreboardView = document.getElementById('scoreboard-view');
+        const toggleViewBtn = document.getElementById('toggle-view-btn');
+        const scoreForm = document.getElementById('score-form');
+        const scoreboardBody = document.getElementById('scoreboard-body');
+        const csvInput = document.getElementById('csv-input');
+        const loadCsvBtn = document.getElementById('load-csv-btn');
+        const copyCsvBtn = document.getElementById('copy-csv-btn');
+        const csvMessage = document.getElementById('csv-message');
+        const formErrorMessage = document.getElementById('form-error-message');
+        const screensaverToggleBtn = document.getElementById('screensaver-toggle-btn');
+        const screensaverView = document.getElementById('screensaver-view');
+        const slideContent = document.getElementById('slide-content');
+
+        // --- 状態管理 ---
+        let scores = [];
+        let isBoardVisible = true;
+        let lastRegisteredTimestamp = null;
+        let screensaverTimeout = null;
+        let isScreensaverActive = false;
+
+        // --- ビューの切り替え機能 ---
+        function toggleView() {
+            isBoardVisible = !isBoardVisible;
+            if (isBoardVisible) {
+                registerView.classList.add('hidden');
+                scoreboardView.classList.remove('hidden');
+                toggleViewBtn.textContent = 'スコア登録';
+            } else {
+                registerView.classList.remove('hidden');
+                scoreboardView.classList.add('hidden');
+                toggleViewBtn.textContent = 'スコア一覧に戻る';
+            }
+        }
+        toggleViewBtn.addEventListener('click', toggleView);
+
+        // --- タイムスタンプのフォーマット ---
+        function formatCustomTimestamp(isoString) {
+            if (!isoString) return 'N/A';
+            const scoreDate = new Date(isoString);
+            const eventStartDate = new Date('2025-08-06T00:00:00');
+            const scoreDay = new Date(scoreDate.getFullYear(), scoreDate.getMonth(), scoreDate.getDate());
+            const startDay = new Date(eventStartDate.getFullYear(), eventStartDate.getMonth(), eventStartDate.getDate());
+            const timeDiff = scoreDay.getTime() - startDay.getTime();
+            const dayNumber = Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1;
+            if (dayNumber < 1) return scoreDate.toLocaleDateString('ja-JP');
+            const hours = scoreDate.getHours().toString().padStart(2, '0');
+            const minutes = scoreDate.getMinutes().toString().padStart(2, '0');
+            return `${dayNumber}日目 ${hours}:${minutes}`;
+        }
+
+        // --- クリアタイムを秒に変換 ---
+        function parseTimeToSeconds(timeString) {
+            if (!timeString || typeof timeString !== 'string') {
+                return null; // タイムがない場合はnull
+            }
+            const parts = timeString.match(/(\d+):(\d{2})\.?(\d{1,2})?/);
+            if (!parts) return null;
+            
+            const minutes = parseInt(parts[1], 10);
+            const seconds = parseInt(parts[2], 10);
+            const milliseconds = parseInt(parts[3] || "0", 10);
+
+            if (isNaN(minutes) || isNaN(seconds)) return null;
+
+            return minutes * 60 + seconds + milliseconds / 100;
+        }
+
+        // --- スコアの描画 ---
+        function renderScores() {
+            scores.sort((a, b) => {
+                // 1. ゲート通過数の降順
+                if (b.gates !== a.gates) {
+                    return b.gates - a.gates;
+                }
+                
+                // 2. クリアタイムの昇順 (短い方が良い)
+                const timeA = parseTimeToSeconds(a.clearTime);
+                const timeB = parseTimeToSeconds(b.clearTime);
+
+                if (timeA === null && timeB !== null) return 1; // タイム無しはタイム有りより下
+                if (timeA !== null && timeB === null) return -1; // タイム有りはタイム無しより上
+                if (timeA !== null && timeB !== null && timeA !== timeB) {
+                    return timeA - timeB;
+                }
+
+                // 3. 記録日時の降順 (新しい方が良い)
+                return new Date(b.timestamp) - new Date(a.timestamp);
+            });
+
+            scoreboardBody.innerHTML = ''; 
+            if (scores.length === 0) {
+                scoreboardBody.innerHTML = '<tr><td colspan="5" class="text-center p-8">データがありません。</td></tr>';
+                return;
+            }
+            scores.forEach((score, index) => {
+                const row = document.createElement('tr');
+                if (score.timestamp === lastRegisteredTimestamp) row.classList.add('highlight');
+                const timestamp = formatCustomTimestamp(score.timestamp);
+                const rank = index + 1;
+                row.innerHTML = `
+                    <td class="text-center p-6 border-b border-gray-200 text-gray-800 align-middle font-bold text-lg">${rank}</td>
+                    <td class="text-left p-6 border-b border-gray-200 text-gray-800 align-middle whitespace-nowrap">${timestamp}</td>
+                    <td class="text-left p-6 border-b border-gray-200 text-gray-800 align-middle">${escapeHtml(score.nickname)}</td>
+                    <td class="text-center p-6 border-b border-gray-200 text-gray-800 align-middle">${escapeHtml(score.gates.toString())}</td>
+                    <td class="text-left p-6 border-b border-gray-200 text-gray-800 align-middle font-mono text-lg">${score.clearTime ? escapeHtml(score.clearTime) : 'N/A'}</td>
+                `;
+                scoreboardBody.appendChild(row);
+            });
+        }
+        
+        function escapeHtml(str) {
+            if (typeof str !== 'string') return '';
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(str));
+            return div.innerHTML;
+        }
+
+        // --- フォームの送信処理 ---
+        scoreForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const nickname = scoreForm.nickname.value;
+            const gates = scoreForm.gates.value;
+            const clearTime = scoreForm['clear-time'].value;
+            if (nickname.includes(' ') || gates.includes(' ') || clearTime.includes(' ')) {
+                formErrorMessage.textContent = '入力にスペースを含めることはできません。';
+                formErrorMessage.classList.remove('hidden');
+                setTimeout(() => formErrorMessage.classList.add('hidden'), 3000);
+                return;
+            }
+            const newScore = { nickname, gates: Number(gates), clearTime: clearTime || null, timestamp: new Date().toISOString() };
+            lastRegisteredTimestamp = newScore.timestamp;
+            scores.push(newScore);
+            renderScores();
+            scoreForm.reset();
+            scoreForm.nickname.value = '名無し'; 
+            toggleView();
+        });
+        
+        // --- CSV処理 ---
+        function showCsvMessage(message) {
+            csvMessage.textContent = message;
+            setTimeout(() => csvMessage.textContent = '', 3000);
+        }
+        function escapeCsvField(field) {
+            const str = String(field == null ? '' : field);
+            if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes(' ')) return `"${str.replace(/"/g, '""')}"`;
+            return str;
+        }
+        function convertToCsv() {
+            return scores.map(s => [escapeCsvField(s.timestamp), escapeCsvField(s.nickname), escapeCsvField(s.gates), escapeCsvField(s.clearTime)].join(',')).join(' ');
+        }
+        function parseCsv(csvString) {
+            const result = [];
+            let records = csvString.trim().split(' ').filter(r => r.trim() !== '');
+            if (records.length === 0) return [];
+            for (const record of records) {
+                const values = [];
+                let currentField = '';
+                let inQuotes = false;
+                for (let i = 0; i < record.length; i++) {
+                    const char = record[i];
+                    if (inQuotes) {
+                        if (char === '"' && record[i + 1] === '"') { currentField += '"'; i++; } 
+                        else if (char === '"') { inQuotes = false; } 
+                        else { currentField += char; }
+                    } else {
+                        if (char === '"') { inQuotes = true; } 
+                        else if (char === ',') { values.push(currentField); currentField = ''; } 
+                        else { currentField += char; }
+                    }
+                }
+                values.push(currentField);
+                if (values.length < 3) continue;
+                const [timestamp, nickname, gates, clearTime] = values;
+                result.push({ timestamp, nickname, gates: Number(gates) || 0, clearTime: (clearTime && clearTime !== 'null' && clearTime !== '') ? clearTime : null });
+            }
+            return result;
+        }
+        copyCsvBtn.addEventListener('click', () => {
+            if (scores.length === 0) { showCsvMessage('コピーするデータがありません。'); return; }
+            lastRegisteredTimestamp = null;
+            renderScores();
+            const csv = convertToCsv();
+            const textarea = document.createElement('textarea');
+            textarea.value = csv;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showCsvMessage('コピーしました！');
+        });
+        loadCsvBtn.addEventListener('click', () => {
+            const csv = csvInput.value;
+            if (!csv) { showCsvMessage('データを貼り付けてください。'); return; }
+            try {
+                const loadedScores = parseCsv(csv);
+                if (loadedScores.length === 0 && csv.trim().length > 0) throw new Error('CSVの解析に失敗しました。');
+                scores = loadedScores;
+                lastRegisteredTimestamp = null;
+                renderScores();
+                csvInput.value = '';
+                showCsvMessage('読み込みました。');
+            } catch (error) {
+                showCsvMessage(error.message || '読み込みに失敗しました。');
+                console.error("CSV parsing error:", error);
+            }
+        });
+
+        // --- スクリーンセーバー機能 (更新版) ---
+        function getOrdinal(n) {
+            const s = ["th", "st", "nd", "rd"];
+            const v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        }
+
+        function startScreensaver() {
+            clearTimeout(screensaverTimeout);
+
+            if (scores.length === 0) {
+                slideContent.innerHTML = `<h2 class="text-4xl arcade-font">NO DATA</h2>`;
+                return;
+            }
+            
+            displayTop3AndScheduleScroll();
+        }
+
+        function displayTop3AndScheduleScroll() {
+            const topScores = [...scores].slice(0, 10); // ソート済みの配列をそのまま使用
+
+            if (topScores.length === 0) {
+                slideContent.innerHTML = `<h2 class="text-4xl arcade-font">NO DATA</h2>`;
+                return;
+            };
+
+            const top3Html = `
+                <div class="w-full max-w-5xl mx-auto animate-fadeIn">
+                    <h2 class="text-5xl arcade-font text-center mb-10 text-red-500">TOP RANKING</h2>
+                    <div class="flex flex-col md:flex-row justify-around items-center text-center gap-8">
+                        ${topScores.slice(0, 3).map((score, index) => `
+                            <div class="flex-1">
+                                <p class="text-3xl md:text-4xl mb-6 arcade-font text-blue-400">${getOrdinal(index + 1)}</p>
+                                <h3 class="text-4xl md:text-5xl mb-4 arcade-font text-yellow-300 break-all">${escapeHtml(score.nickname)}</h3>
+                                <p class="text-2xl md:text-3xl arcade-font">${score.gates}</p>
+                                ${score.clearTime ? `<p class="text-xl md:text-2xl arcade-font mt-2 text-cyan-400">${escapeHtml(score.clearTime)}</p>` : `<p class="text-xl md:text-2xl arcade-font mt-2 text-gray-500">Not Cleared</p>`}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            slideContent.innerHTML = top3Html;
+
+            if (topScores.length > 3) {
+                screensaverTimeout = setTimeout(() => startScrollingRanks(topScores), 8000);
+            } else {
+                screensaverTimeout = setTimeout(displayTop3AndScheduleScroll, 8000);
+            }
+        }
+
+        function startScrollingRanks(topScores) {
+            const scrollingScores = topScores.slice(3);
+            const scrollingHtml = `
+                <div class="scroll-up-animation w-full max-w-5xl">
+                    ${scrollingScores.map((score, index) => `
+                        <div class="flex items-center justify-between text-2xl md:text-3xl arcade-font p-4 my-3">
+                            <span class="text-blue-400 w-1/5 text-left">${getOrdinal(index + 4)}</span>
+                            <span class="text-yellow-300 w-2/5 text-center break-all">${escapeHtml(score.nickname)}</span>
+                            <span class="text-white w-1/5 text-right pr-4">${score.gates}</span>
+                            <span class="text-cyan-400 w-1/5 text-right text-2xl">${score.clearTime ? escapeHtml(score.clearTime) : '<span class="text-gray-500 text-xl">Not Cleared</span>'}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            slideContent.innerHTML = scrollingHtml;
+            
+            screensaverTimeout = setTimeout(displayTop3AndScheduleScroll, 12000);
+        }
+
+        function stopScreensaver() {
+            clearTimeout(screensaverTimeout);
+            screensaverTimeout = null;
+            slideContent.innerHTML = '';
+        }
+
+        function toggleScreensaverMode() {
+            isScreensaverActive = !isScreensaverActive;
+            if (isScreensaverActive) {
+                appContainer.classList.add('hidden');
+                screensaverView.classList.remove('hidden');
+                startScreensaver();
+            } else {
+                appContainer.classList.remove('hidden');
+                screensaverView.classList.add('hidden');
+                stopScreensaver();
+            }
+        }
+
+        screensaverToggleBtn.addEventListener('click', toggleScreensaverMode);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isScreensaverActive) {
+                toggleScreensaverMode();
+            }
+        });
+        // スクリーンセーバー画面をクリック（タッチ）しても元に戻るようにする
+        screensaverView.addEventListener('click', () => {
+            if (isScreensaverActive) {
+                toggleScreensaverMode();
+            }
+        });
+
+        // --- 初期化処理の実行 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            renderScores();
+            registerView.classList.add('hidden');
+            scoreboardView.classList.remove('hidden');
+            isBoardVisible = true;
+            toggleViewBtn.textContent = 'スコア登録';
+        });
+    </script>
+
+</body>
+</html>
